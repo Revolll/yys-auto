@@ -2,6 +2,7 @@ from PySide2.QtCore import *
 from PySide2.QtGui import *
 from PySide2.QtWidgets import *
 from duixiang import Ui_MainWindow
+from spy import SpyLabel
 from multctrl import MulCtrl
 import ini
 import compare
@@ -41,23 +42,12 @@ class Win(QMainWindow):
 
         self.ui.pushButton.clicked.connect(self.add_com)
         self.ui.comboBox.activated.connect(self.show_group)
-
-    def prtsc(self):
-        x, y, w, h = ini.coordinates()
-        pwnd = self.get_handle()
-        screen = QApplication.primaryScreen()
-        if x == y == w == h:
-            img = screen.grabWindow(eval(pwnd[0])).toImage()
-        else:
-            img = screen.grabWindow(eval(pwnd[0]), x, y, w, h).toImage()
-        t = time.strftime('%Y%m%d%H%M%S', time.localtime())
-        img.save(f'./image/screenshots/截图_{t}.jpg')
-        self.btn.setText('截屏已保存')
+        self.pixmap = QPixmap('./image/background.jpg')
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        pixmap = QPixmap('./image/background.jpg')
-        painter.drawPixmap(self.rect(), pixmap)
+        # pixmap = QPixmap('./image/background.jpg')
+        painter.drawPixmap(self.rect(), self.pixmap)
 
     def get_handle(self):
         all_handle = []
@@ -69,7 +59,6 @@ class Win(QMainWindow):
         return handle
 
     def add_com(self):
-        self.btn.setText('截屏')
         handle = self.get_handle()
         self.ui.comboBox.clear()
         if not self.flag:
@@ -233,8 +222,8 @@ class gbox(QGroupBox):
         t = time.strftime('%H:%M:%S', time.localtime())
         leng0 = len(msg)
         leng1 = sum(i.isalpha() for i in msg)
-        leng2 = leng0-leng1
-        self.textBrowser.append(f"{msg}{'.'*(30 - (2 * leng1 + leng2))}{t}")
+        leng2 = leng0 - leng1
+        self.textBrowser.append(f"{msg}{'.' * (30 - (2 * leng1 + leng2))}{t}")
 
 
 class Main(Win):
@@ -248,6 +237,43 @@ class Main(Win):
         self.sig.connect(self.m_ctrl._click)
 
         self.model = '0'  # 0为前台模式，1为后台模式
+
+        self._spy = SpyLabel(self)
+        self._spy.setGeometry(30, 40, 30, 30)
+        self.stat = QStatusBar(self)
+        self.stat.setGeometry(0, 520, 600, 20)
+
+    def out_put(self, message):
+        self.stat.showMessage(",".join(message))
+
+    # def leaveEvent(self, event):
+    #     self.setWindowOpacity(0.01)
+    #     print(f"出：{time.time()}")
+    #
+    # def enterEvent(self, event):
+    #     self.setWindowOpacity(0.1)
+    #     print(f"入：{time.time()}")
+
+    def prtsc(self):
+        hwnd = self.stat.currentMessage().split(',')[0][7:]
+        if hwnd:
+            screen = QApplication.primaryScreen()
+            img = screen.grabWindow(int(hwnd)).toImage()
+        else:
+            x, y, w, h = ini.coordinates()
+            pwnd = self.get_handle()
+            if pwnd:
+                screen = QApplication.primaryScreen()
+                if x == y == w == h:
+                    img = screen.grabWindow(eval(pwnd[0])).toImage()
+                else:
+                    img = screen.grabWindow(eval(pwnd[0]), x, y, w, h).toImage()
+            else:
+                self.stat.showMessage('未检测到窗口', 3000)
+                return
+        t = time.strftime('%Y%m%d%H%M%S', time.localtime())
+        img.save(f'./image/screenshots/截图_{t}.jpg')
+        self.stat.showMessage('截屏已保存', 3000)
 
     def config(self):
         with open('config.txt', 'r') as f:
@@ -269,7 +295,7 @@ class Main(Win):
         yulin = Image.open('./image/yulin.jpg')  # 670, 365, 70, 50
         self.yulin = self.get_hash(yulin)
 
-        #御魂、日轮相关
+        # 御魂、日轮相关
         yh_c = Image.open('./image/yh_c.jpg')  # 720, 380, 60, 30
         self.yh_c = self.get_hash(yh_c)
         yh_v = Image.open('./image/yh_v.jpg')  # 260, 60, 70, 45
@@ -486,7 +512,7 @@ class Main(Win):
 
             if obj['gbox'].radioButton_5.isChecked():
                 t_f = threading.Thread(target=self._run_tp_failure,
-                                      args=(obj,))
+                                       args=(obj,))
 
                 t_f.setDaemon(True)
                 t_f.start()
@@ -700,7 +726,7 @@ class Main(Win):
     def prtsr(self, pwnd, x, y, w, h):
         if self.model == '0':
             x0, y0, w0, h0 = win32gui.GetWindowRect(pwnd)
-            img = ImageGrab.grab((x0+x+8, y0+y+30, x0+x+w+8, y0+y+h+30))
+            img = ImageGrab.grab((x0 + x + 8, y0 + y + 30, x0 + x + w + 8, y0 + y + h + 30))
         else:
             screen = QApplication.primaryScreen()
             scr = screen.grabWindow(pwnd, x, y, w, h).toImage()
@@ -711,14 +737,14 @@ class Main(Win):
     def click_pos(self, pwnd, pos_x, pos_y):
         """鼠标单击坐标（pos_x, pos_y）"""
         win32api.SendMessage(pwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, win32api.MAKELONG(pos_x, pos_y))
-        t = random.randrange(100, 250)/1000
+        t = random.randrange(100, 250) / 1000
         time.sleep(t)
         win32api.SendMessage(pwnd, win32con.WM_LBUTTONUP, win32con.MK_LBUTTON, win32api.MAKELONG(pos_x, pos_y))
 
     # 获得图像的hash值
     def get_hash(self, img):
-        img = img.resize((16, 16), Image.ANTIALIAS).convert('L')  # 抗锯齿 灰度
-        # img = img.resize((16, 16)).convert('L')  # 抗锯齿 灰度
+        # img = img.resize((16, 16), Image.ANTIALIAS).convert('L')  # 抗锯齿 灰度
+        img = img.resize((16, 16)).convert('L')  # 抗锯齿 灰度
         avg = sum(list(img.getdata())) / 256  # 计算像素平均值
         s = ''.join(map(lambda i: '0' if i < avg else '1', img.getdata()))  # 每个像素进行比对,大于avg为1,反之为0
         return ''.join(map(lambda j: '%x' % int(s[j:j + 4], 2), range(0, 256, 4)))
@@ -742,6 +768,7 @@ class Main(Win):
             b = True
         return b
 
+
 #
 # class Th(QThread):
 #     def __init__(self, target, args=()):
@@ -759,8 +786,6 @@ if __name__ == '__main__':
     mainWindow.setWindowTitle('大公举V3.01')
     mainWindow.show()
     sys.exit(app.exec_())
-
-
 
 # # 获取到text光标
 # textCursor = gbox.textBrowser.textCursor()
