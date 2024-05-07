@@ -91,6 +91,7 @@ class SpyLabel(QLabel):
             win32gui.InvalidateRect(hwnd, None, True)
         except:
             self.sig_spy.emit("访问被拒绝需管理员身份运行")
+            return
         win32gui.UpdateWindow(hwnd)
         win32gui.RedrawWindow(hwnd, None, None,
                               win32con.RDW_FRAME | win32con.RDW_INVALIDATE | win32con.RDW_UPDATENOW | win32con.RDW_ALLCHILDREN)
